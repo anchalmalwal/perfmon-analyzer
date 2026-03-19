@@ -4,16 +4,31 @@
     <title>PerfMon Analyzer</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
-<h2>PerfMon Analyzer Tool</h2>
-<p>
-Upload PerfMon CSV file (Convert using: relog input.blg -f csv -o output.csv)
-</p>
-<input type="file" id="fileInput" />
-<div id="output"></div>
+    <h2>PerfMon Analyzer Tool</h2>
 
-<script src="script.js"></script>
+    <p>
+        Upload PerfMon CSV file (Convert using: relog input.blg -f csv -o output.csv)
+    </p>
+
+    <input type="file" id="fileInput" />
+
+    <hr>
+
+    <h3>Capture Details</h3>
+
+    <p id="server"><b>Server:</b> -</p>
+    <p id="start"><b>Start:</b> -</p>
+    <p id="stop"><b>Stop:</b> -</p>
+    <p id="duration"><b>Duration:</b> -</p>
+
+    <hr>
+
+    <div id="output"></div>
+
+    <script src="script.js"></script>
 
 </body>
 </html>
