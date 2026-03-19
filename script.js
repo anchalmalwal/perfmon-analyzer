@@ -23,6 +23,27 @@ function parseCSV(text) {
 
     const headers = splitCSVLine(lines[0]);
 
+// Extract timestamps
+let timestamps = [];
+
+for (let i = 1; i < lines.length; i++) {
+    const row = splitCSVLine(lines[i]);
+
+    if (row[0]) {
+        timestamps.push(row[0]);
+    }
+}
+
+// Calculate start, stop
+const startTime = timestamps[0];
+const endTime = timestamps[timestamps.length - 1];
+
+// Calculate duration
+const duration = calculateDuration(startTime, endTime);
+
+// Display metadata
+displayMeta(startTime, endTime, duration);
+
     let data = {};
 
     // Initialize counters (ignore timestamp column)
@@ -147,4 +168,33 @@ function displayResult(counters) {
     html += "</table>";
 
     document.getElementById("output").innerHTML = html;
+}
+function displayMeta(start, end, duration) {
+    document.querySelector("p:nth-of-type(1)").innerText = "Start: " + start;
+    document.querySelector("p:nth-of-type(2)").innerText = "Stop: " + end;
+
+    // Add duration dynamically
+    let durEl = document.getElementById("duration");
+
+    if (!durEl) {
+        durEl = document.createElement("p");
+        durEl.id = "duration";
+        document.body.insertBefore(durEl, document.getElementById("output"));
+    }
+
+    durEl.innerText = "Duration: " + duration;
+}
+
+function calculateDuration(start, end) {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+
+    const diffMs = endDate - startDate;
+
+    const seconds = Math.floor(diffMs / 1000);
+    const mins = Math.floor(seconds / 60);
+    const hours = Math.floor(mins / 60);
+    const days = Math.floor(hours / 24);
+
+    return `${days}d ${hours % 24}h ${mins % 60}m ${seconds % 60}s`;
 }
