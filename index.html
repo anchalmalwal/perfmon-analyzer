@@ -1,34 +1,197 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>PerfMon Analyzer</title>
-    <link rel="stylesheet" href="style.css">
-</head>
+document.getElementById('fileInput').addEventListener('change', function (e) {
+    const file = e.target.files[0];
 
-<body>
+    if (!file) return;
 
-    <h2>PerfMon Analyzer Tool</h2>
+    const reader = new FileReader();
 
-    <p>
-        Upload PerfMon CSV file (Convert using: relog input.blg -f csv -o output.csv)
-    </p>
+    reader.onload = function (event) {
+        parseCSV(event.target.result);
+    };
 
-    <input type="file" id="fileInput" />
+    reader.readAsText(file);
+});
 
-    <hr>
+function parseCSV(text) {
 
-    <h3>Capture Details</h3>
+    const lines = text.split('\n').filter(l => l.trim() !== '');
 
-    <p id="server"><b>Server:</b> -</p>
-    <p id="start"><b>Start:</b> -</p>
-    <p id="stop"><b>Stop:</b> -</p>
-    <p id="duration"><b>Duration:</b> -</p>
+    if (lines.length < 2) {
+        alert("Invalid CSV file");
+        return;
+    }
 
-    <hr>
+    const headers = splitCSVLine(lines[0]);
 
-    <div id="output"></div>
+    let data = {};
+    let timestamps = [];
+    let serverName = "";
 
-    <script src="script.js"></script>
+    // Initialize counters + extract server
+    headers.forEach(h => {
+        if (h.includes('\\')) {
+            data[h] = [];
 
-</body>
-</html>
+            // Extract server name once
+            if (!serverName) {
+                const match = h.match(/^\\\\([^\\]+)/);
+                if (match) {
+                    serverName = match[1];
+                }
+            }
+        }
+    });
+
+    // Read rows
+    for (let i = 1; i < lines.length; i++) {
+        const row = splitCSVLine(lines[i]);
+
+        if (row[0]) {
+            timestamps.push(row[0]);
+        }
+
+        headers.forEach((h, index) => {
+            if (data[h] && row[index]) {
+                const val = parseFloat(row[index]);
+                if (!isNaN(val)) {
+                    data[h].push(val);
+                }
+            }
+        });
+    }
+
+    // Calculate time info
+    const startTime = timestamps[0];
+    const endTime = timestamps[timestamps.length - 1];
+    const duration = calculateDuration(startTime, endTime);
+
+    // Display metadata
+    displayMeta(serverName, startTime, endTime, duration);
+
+    // Calculate counters
+    let counters = [];
+
+    for (let key in data) {
+        const values = data[key];
+        if (values.length === 0) continue;
+
+        const avg = values.reduce((a, b) => a + b, 0) / values.length;
+        const max = Math.max(...values);
+        const min = Math.min(...values);
+
+        counters.push({
+            name: cleanName(key),
+            avg: avg,
+            max: max,
+            min: min
+        });
+    }
+
+    displayResult(counters);
+}
+
+// ✅ Proper CSV split (handles quotes)
+function splitCSVLine(line) {
+    const result = [];
+    const regex = /(".*?"|[^",\s]+)(?=\s*,|\s*$)/g;
+    let match;
+
+    while ((match = regex.exec(line)) !== null) {
+        result.push(match[0].replace(/"/g, ''));
+    }
+
+    return result;
+}
+
+// ✅ Clean counter name
+function cleanName(name) {
+    return name
+        .replace(/^\\\\.*?\\/, '') // remove server name
+        .replace(/"/g, '');
+}
+
+// ✅ Calculate duration
+function calculateDuration(start, end) {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+
+    const diffMs = endDate - startDate;
+
+    const seconds = Math.floor(diffMs / 1000);
+    const mins = Math.floor(seconds / 60);
+    const hours = Math.floor(mins / 60);
+    const days = Math.floor(hours / 24);
+
+    return `${days}d ${hours % 24}h ${mins % 60}m ${seconds % 60}s`;
+}
+
+// ✅ Display metadata
+function displayMeta(server, start, end, duration) {
+
+    document.getElementById("server").innerHTML = `<b>Server:</b> ${server || "-"}`;
+    document.getElementById("start").innerHTML = `<b>Start:</b> ${start || "-"}`;
+    document.getElementById("stop").innerHTML = `<b>Stop:</b> ${end || "-"}`;
+    document.getElementById("duration").innerHTML = `<b>Duration:</b> ${duration || "-"}`;
+}
+
+// ✅ Analysis logic
+function analyzeCounter(c) {
+
+    if (c.name.includes("Disk sec/Read") && c.avg > 0.02)
+        return "🔴 High Disk Latency";
+
+    if (c.name.includes("Disk sec/Write") && c.avg > 0.02)
+        return "🔴 High Disk Write Latency";
+
+    if (c.name.includes("% Processor Time") && c.avg > 80)
+        return "🔴 CPU Bottleneck";
+
+    if (c.name.includes("Available MBytes") && c.avg < 2000)
+        return "🟠 Low Memory";
+
+    if (c.name.includes("Page life expectancy") && c.avg < 300)
+        return "🔴 Memory Pressure";
+
+    if (c.name.includes("Buffer cache hit ratio") && c.avg < 95)
+        return "🟠 Cache Issue";
+
+    return "🟢 Healthy";
+}
+
+// ✅ Display table
+function displayResult(counters) {
+
+    if (counters.length === 0) {
+        document.getElementById("output").innerHTML = "<p>No valid data found.</p>";
+        return;
+    }
+
+    let html = `
+        <table>
+        <tr>
+            <th>Counter</th>
+            <th>Avg</th>
+            <th>Max</th>
+            <th>Min</th>
+            <th>Status</th>
+        </tr>
+    `;
+
+    counters.forEach(c => {
+        const status = analyzeCounter(c);
+
+        html += `
+            <tr>
+                <td>${c.name}</td>
+                <td>${c.avg.toFixed(3)}</td>
+                <td>${c.max.toFixed(3)}</td>
+                <td>${c.min.toFixed(3)}</td>
+                <td>${status}</td>
+            </tr>
+        `;
+    });
+
+    html += "</table>";
+
+    document.getElementById("output").innerHTML = html;
+}
