@@ -39,7 +39,7 @@ function parseCSV(text) {
         }
     });
 
-    // Read data rows
+    // Read rows
     for (let i = 1; i < lines.length; i++) {
         const row = splitCSVLine(lines[i]);
 
@@ -67,7 +67,7 @@ function parseCSV(text) {
 
     displayMeta(serverName, startTime, endTime, duration);
 
-    // Calculate metrics
+    // Calculate counters
     let counters = [];
 
     for (let key in data) {
@@ -89,7 +89,7 @@ function parseCSV(text) {
     displayResult(counters);
 }
 
-// Proper CSV parsing (handles quotes)
+// Proper CSV split (handles quotes)
 function splitCSVLine(line) {
     const result = [];
     const regex = /(".*?"|[^",]+)(?=\s*,|\s*$)/g;
@@ -105,7 +105,7 @@ function splitCSVLine(line) {
 // Clean counter name
 function cleanName(name) {
     return name
-        .replace(/^\\\\.*?\\/, '') // remove server name
+        .replace(/^\\\\.*?\\/, '')
         .replace(/"/g, '');
 }
 
@@ -156,7 +156,23 @@ function analyzeCounter(c) {
     return "🟢 Healthy";
 }
 
-// Display table
+// Severity scoring
+function getSeverityScore(c) {
+    const status = analyzeCounter(c);
+
+    if (status.includes("🔴")) return 3;
+    if (status.includes("🟠")) return 2;
+    return 1;
+}
+
+// Row color
+function getRowColor(status) {
+    if (status.includes("🔴")) return "#ffcccc";
+    if (status.includes("🟠")) return "#ffe0b3";
+    return "#ccffcc";
+}
+
+// Display results with Top Issues
 function displayResult(counters) {
 
     if (counters.length === 0) {
@@ -164,7 +180,28 @@ function displayResult(counters) {
         return;
     }
 
-    let html = `
+    // Sort worst first
+    counters.sort((a, b) => getSeverityScore(b) - getSeverityScore(a));
+
+    // Top 5 issues
+    const topIssues = counters
+        .filter(c => analyzeCounter(c) !== "🟢 Healthy")
+        .slice(0, 5);
+
+    let summaryHtml = "<h3>Top Issues</h3>";
+
+    if (topIssues.length === 0) {
+        summaryHtml += "<p>✅ No major issues detected</p>";
+    } else {
+        summaryHtml += "<ul>";
+        topIssues.forEach(c => {
+            summaryHtml += `<li><b>${c.name}</b> → ${analyzeCounter(c)}</li>`;
+        });
+        summaryHtml += "</ul>";
+    }
+
+    // Table
+    let tableHtml = `
         <table>
         <tr>
             <th>Counter</th>
@@ -177,9 +214,10 @@ function displayResult(counters) {
 
     counters.forEach(c => {
         const status = analyzeCounter(c);
+        const color = getRowColor(status);
 
-        html += `
-            <tr>
+        tableHtml += `
+            <tr style="background-color:${color}">
                 <td>${c.name}</td>
                 <td>${c.avg.toFixed(3)}</td>
                 <td>${c.max.toFixed(3)}</td>
@@ -189,7 +227,7 @@ function displayResult(counters) {
         `;
     });
 
-    html += "</table>";
+    tableHtml += "</table>";
 
-    document.getElementById("output").innerHTML = html;
+    document.getElementById("output").innerHTML = summaryHtml + tableHtml;
 }
