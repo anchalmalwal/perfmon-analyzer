@@ -13,10 +13,7 @@ document.getElementById('fileInput').addEventListener('change', function (e) {
 function parseCSV(text) {
 
     const lines = text.split('\n').filter(l => l.trim() !== '');
-    if (lines.length < 2) {
-        alert("Invalid CSV file");
-        return;
-    }
+    if (lines.length < 2) return;
 
     const headers = splitCSVLine(lines[0]);
 
@@ -48,11 +45,6 @@ function parseCSV(text) {
         });
     }
 
-    if (timestamps.length === 0) {
-        document.getElementById("output").innerHTML = "<p>No valid data found.</p>";
-        return;
-    }
-
     const startTime = timestamps[0];
     const endTime = timestamps[timestamps.length - 1];
     const duration = calculateDuration(startTime, endTime);
@@ -73,11 +65,12 @@ function parseCSV(text) {
             name: cleanName(key),
             avg,
             max,
-            min
+            min,
+            series: values   // 🔥 needed for graph
         });
     }
 
-    displayResult(counters);
+    displayResult(counters, timestamps);
 }
 
 // CSV parser
@@ -154,8 +147,8 @@ function getRowColor(status) {
     return "#ccffcc";
 }
 
-// Display
-function displayResult(counters) {
+// Display result
+function displayResult(counters, timestamps) {
 
     counters.sort((a, b) => getSeverityScore(b) - getSeverityScore(a));
 
@@ -201,14 +194,14 @@ function displayResult(counters) {
 
     document.getElementById("output").innerHTML = html;
 
-    renderCharts(counters);
+    renderCharts(counters, timestamps);
 }
 
-// 🔥 FIXED chart rendering
-function renderCharts(counters) {
+// 🔥 LINE GRAPH (time-series)
+function renderCharts(counters, timestamps) {
 
     const container = document.getElementById("charts");
-    container.innerHTML = "<h3>Problematic Counters (🔴)</h3>";
+    container.innerHTML = "<h3>Problematic Counters (Line Graph)</h3>";
 
     const red = counters.filter(c => analyzeCounter(c).includes("🔴"));
 
@@ -220,26 +213,34 @@ function renderCharts(counters) {
     red.forEach((c, i) => {
 
         const canvas = document.createElement("canvas");
-        canvas.id = "chart_" + i;
-        canvas.style.maxWidth = "600px";
-        canvas.style.marginBottom = "30px";
+        canvas.style.maxWidth = "900px";
+        canvas.style.marginBottom = "40px";
 
         container.appendChild(canvas);
 
         const ctx = canvas.getContext("2d");
 
         new Chart(ctx, {
-            type: 'bar',
+            type: 'line',
             data: {
-                labels: ["Avg", "Max", "Min"],
+                labels: timestamps,
                 datasets: [{
                     label: c.name,
-                    data: [c.avg, c.max, c.min],
-                    backgroundColor: ["#ff4d4d", "#ff9999", "#ffcccc"]
+                    data: c.series,
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.2
                 }]
             },
             options: {
-                responsive: true
+                responsive: true,
+                scales: {
+                    x: {
+                        ticks: {
+                            maxTicksLimit: 10
+                        }
+                    }
+                }
             }
         });
     });
