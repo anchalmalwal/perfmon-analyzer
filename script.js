@@ -3,77 +3,84 @@ document.getElementById('fileInput').addEventListener('change', function (e) {
     const reader = new FileReader();
 
     reader.onload = function (event) {
-        parsePerfmon(event.target.result);
+        parseCSV(event.target.result);
     };
 
     reader.readAsText(file);
 });
 
-function parsePerfmon(text) {
+function parseCSV(text) {
     const lines = text.split('\n');
+    const headers = lines[0].split(',');
 
-    let metadata = {};
-    let counters = [];
-    let tableStart = false;
+    let data = {};
 
-    lines.forEach(line => {
-        line = line.trim();
-
-        if (line.startsWith("Capture Start Time"))
-            metadata.start = line.split(':')[1]?.trim();
-
-        if (line.startsWith("Capture Stop Time"))
-            metadata.stop = line.split(':')[1]?.trim();
-
-        if (line.startsWith("Server Name"))
-            metadata.server = line.split(':')[1]?.trim();
-
-        if (line.includes("Counter Name")) {
-            tableStart = true;
-            return;
-        }
-
-        if (line.startsWith("---") || line === "") return;
-
-        if (tableStart) {
-            const parts = line.split(/\s{2,}/);
-
-            if (parts.length >= 4) {
-                counters.push({
-                    name: parts[0],
-                    avg: parseFloat(parts[1]),
-                    max: parseFloat(parts[2]),
-                    min: parseFloat(parts[3])
-                });
-            }
+    headers.forEach(h => {
+        if (h.includes('\\')) {
+            data[h] = [];
         }
     });
 
-    displayResult(metadata, counters);
+    for (let i = 1; i < lines.length; i++) {
+        const row = lines[i].split(',');
+
+        headers.forEach((h, index) => {
+            if (data[h] && row[index]) {
+                const val = parseFloat(row[index]);
+                if (!isNaN(val)) {
+                    data[h].push(val);
+                }
+            }
+        });
+    }
+
+    let counters = [];
+
+    for (let key in data) {
+        const values = data[key];
+        if (values.length === 0) continue;
+
+        const avg = values.reduce((a, b) => a + b, 0) / values.length;
+        const max = Math.max(...values);
+        const min = Math.min(...values);
+
+        counters.push({
+            name: key.replace(/^\\\\.*?\\/, ''),
+            avg: avg,
+            max: max,
+            min: min
+        });
+    }
+
+    displayResult(counters);
 }
 
 function analyzeCounter(c) {
-    if (c.name.includes("Avg. Disk sec/Read") && c.avg > 0.02)
-        return "⚠ High Disk Latency";
+
+    if (c.name.includes("Disk sec/Read") && c.avg > 0.02)
+        return "🔴 High Disk Latency";
+
+    if (c.name.includes("Disk sec/Write") && c.avg > 0.02)
+        return "🔴 High Disk Write Latency";
 
     if (c.name.includes("% Processor Time") && c.avg > 80)
-        return "⚠ CPU High";
+        return "🔴 CPU Bottleneck";
 
     if (c.name.includes("Available MBytes") && c.avg < 2000)
-        return "⚠ Low Memory";
+        return "🟠 Low Memory";
 
     if (c.name.includes("Page life expectancy") && c.avg < 300)
-        return "⚠ Memory Pressure";
+        return "🔴 Memory Pressure";
 
-    return "OK";
+    if (c.name.includes("Buffer cache hit ratio") && c.avg < 95)
+        return "🟠 Cache Issue";
+
+    return "🟢 Healthy";
 }
 
-function displayResult(meta, counters) {
-    let html = `
-        <h3>Server: ${meta.server || ""}</h3>
-        <p>Start: ${meta.start || ""}</p>
-        <p>Stop: ${meta.stop || ""}</p>
+function displayResult(counters) {
 
+    let html = `
         <table>
         <tr>
             <th>Counter</th>
@@ -90,9 +97,9 @@ function displayResult(meta, counters) {
         html += `
             <tr>
                 <td>${c.name}</td>
-                <td>${c.avg}</td>
-                <td>${c.max}</td>
-                <td>${c.min}</td>
+                <td>${c.avg.toFixed(3)}</td>
+                <td>${c.max.toFixed(3)}</td>
+                <td>${c.min.toFixed(3)}</td>
                 <td>${status}</td>
             </tr>
         `;
