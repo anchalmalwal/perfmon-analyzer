@@ -2,7 +2,46 @@
 <html>
 <head>
     <title>PerfMon Analyzer</title>
+
+    <!-- Basic Styling -->
     <link rel="stylesheet" href="style.css">
+
+    <style>
+        body {
+            font-family: Arial;
+            margin: 20px;
+        }
+
+        h2 {
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 8px 12px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 8px;
+            border: 1px solid #ccc;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f4f4f4;
+        }
+
+        #charts canvas {
+            margin-top: 20px;
+        }
+    </style>
 </head>
 
 <body>
@@ -10,17 +49,20 @@
     <h2>PerfMon Analyzer Tool</h2>
 
     <p>
-        Upload PerfMon CSV file (Convert using: relog input.blg -f csv -o output.csv)
+        Upload PerfMon CSV file (Convert using: <b>relog input.blg -f csv -o output.csv</b>)
     </p>
 
+    <!-- File Upload -->
     <input type="file" id="fileInput" />
 
-    <br><br>
+    <br>
 
+    <!-- PDF Button -->
     <button onclick="exportPDF()">Download Report (PDF)</button>
 
     <hr>
 
+    <!-- Capture Details -->
     <h3>Capture Details</h3>
 
     <p id="server"><b>Server:</b> -</p>
@@ -30,19 +72,23 @@
 
     <hr>
 
+    <!-- Output -->
     <div id="output"></div>
 
     <hr>
 
+    <!-- Charts -->
     <div id="charts"></div>
+
+    <!-- ✅ REQUIRED SCRIPTS (order matters) -->
 
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- PDF Export -->
+    <!-- html2pdf -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-    <!-- Your Script -->
+    <!-- Your logic -->
     <script src="script.js"></script>
 
 </body>
