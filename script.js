@@ -93,7 +93,7 @@ function splitCSVLine(line) {
     return result;
 }
 
-// Clean counter name
+// Clean name
 function cleanName(name) {
     return name.replace(/^\\\\.*?\\/, '').replace(/"/g, '');
 }
@@ -110,7 +110,7 @@ function calculateDuration(start, end) {
     return `${d}d ${h % 24}h ${m % 60}m ${s % 60}s`;
 }
 
-// Metadata display
+// Metadata
 function displayMeta(server, start, end, duration) {
     document.getElementById("server").innerHTML = `<b>Server:</b> ${server || "-"}`;
     document.getElementById("start").innerHTML = `<b>Start:</b> ${start}`;
@@ -139,7 +139,7 @@ function analyzeCounter(c) {
     return "🟢 Healthy";
 }
 
-// Severity score
+// Severity
 function getSeverityScore(c) {
     const s = analyzeCounter(c);
     if (s.includes("🔴")) return 3;
@@ -154,7 +154,7 @@ function getRowColor(status) {
     return "#ccffcc";
 }
 
-// Display results
+// Display
 function displayResult(counters) {
 
     counters.sort((a, b) => getSeverityScore(b) - getSeverityScore(a));
@@ -204,11 +204,11 @@ function displayResult(counters) {
     renderCharts(counters);
 }
 
-// Charts for 🔴 only
+// 🔥 FIXED chart rendering
 function renderCharts(counters) {
 
     const container = document.getElementById("charts");
-    container.innerHTML = "<h3>Problematic Counters</h3>";
+    container.innerHTML = "<h3>Problematic Counters (🔴)</h3>";
 
     const red = counters.filter(c => analyzeCounter(c).includes("🔴"));
 
@@ -218,17 +218,28 @@ function renderCharts(counters) {
     }
 
     red.forEach((c, i) => {
+
         const canvas = document.createElement("canvas");
+        canvas.id = "chart_" + i;
+        canvas.style.maxWidth = "600px";
+        canvas.style.marginBottom = "30px";
+
         container.appendChild(canvas);
 
-        new Chart(canvas, {
+        const ctx = canvas.getContext("2d");
+
+        new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: ["Avg", "Max", "Min"],
                 datasets: [{
                     label: c.name,
-                    data: [c.avg, c.max, c.min]
+                    data: [c.avg, c.max, c.min],
+                    backgroundColor: ["#ff4d4d", "#ff9999", "#ffcccc"]
                 }]
+            },
+            options: {
+                responsive: true
             }
         });
     });
