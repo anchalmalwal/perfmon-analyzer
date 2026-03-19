@@ -1,6 +1,6 @@
+// File upload handler
 document.getElementById('fileInput').addEventListener('change', function (e) {
     const file = e.target.files[0];
-
     if (!file) return;
 
     const reader = new FileReader();
@@ -23,39 +23,27 @@ function parseCSV(text) {
 
     const headers = splitCSVLine(lines[0]);
 
-// Extract timestamps
-let timestamps = [];
-
-for (let i = 1; i < lines.length; i++) {
-    const row = splitCSVLine(lines[i]);
-
-    if (row[0]) {
-        timestamps.push(row[0]);
-    }
-}
-
-// Calculate start, stop
-const startTime = timestamps[0];
-const endTime = timestamps[timestamps.length - 1];
-
-// Calculate duration
-const duration = calculateDuration(startTime, endTime);
-
-// Display metadata
-displayMeta(startTime, endTime, duration);
-
     let data = {};
+    let timestamps = [];
+    let serverName = "";
 
-    // Initialize counters (ignore timestamp column)
+    // Initialize counters + extract server name
     headers.forEach(h => {
         if (h.includes('\\')) {
             data[h] = [];
+
+            if (!serverName) {
+                const match = h.match(/^\\\\([^\\]+)/);
+                if (match) serverName = match[1];
+            }
         }
     });
 
-    // Process rows
+    // Read data rows
     for (let i = 1; i < lines.length; i++) {
         const row = splitCSVLine(lines[i]);
+
+        if (row[0]) timestamps.push(row[0]);
 
         headers.forEach((h, index) => {
             if (data[h] && row[index]) {
@@ -67,6 +55,19 @@ displayMeta(startTime, endTime, duration);
         });
     }
 
+    if (timestamps.length === 0) {
+        document.getElementById("output").innerHTML = "<p>No valid data found.</p>";
+        return;
+    }
+
+    // Time calculations
+    const startTime = timestamps[0];
+    const endTime = timestamps[timestamps.length - 1];
+    const duration = calculateDuration(startTime, endTime);
+
+    displayMeta(serverName, startTime, endTime, duration);
+
+    // Calculate metrics
     let counters = [];
 
     for (let key in data) {
@@ -88,27 +89,50 @@ displayMeta(startTime, endTime, duration);
     displayResult(counters);
 }
 
-// ✅ Proper CSV line splitter (handles quotes)
+// Proper CSV parsing (handles quotes)
 function splitCSVLine(line) {
     const result = [];
-    const regex = /(".*?"|[^",\s]+)(?=\s*,|\s*$)/g;
+    const regex = /(".*?"|[^",]+)(?=\s*,|\s*$)/g;
     let match;
 
     while ((match = regex.exec(line)) !== null) {
-        result.push(match[0].replace(/"/g, ''));
+        result.push(match[0].replace(/"/g, '').trim());
     }
 
     return result;
 }
 
-// ✅ Clean counter name
+// Clean counter name
 function cleanName(name) {
     return name
         .replace(/^\\\\.*?\\/, '') // remove server name
         .replace(/"/g, '');
 }
 
-// ✅ Analysis logic
+// Duration calculation
+function calculateDuration(start, end) {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+
+    const diffMs = endDate - startDate;
+
+    const seconds = Math.floor(diffMs / 1000);
+    const mins = Math.floor(seconds / 60);
+    const hours = Math.floor(mins / 60);
+    const days = Math.floor(hours / 24);
+
+    return `${days}d ${hours % 24}h ${mins % 60}m ${seconds % 60}s`;
+}
+
+// Display metadata
+function displayMeta(server, start, end, duration) {
+    document.getElementById("server").innerHTML = `<b>Server:</b> ${server || "-"}`;
+    document.getElementById("start").innerHTML = `<b>Start:</b> ${start || "-"}`;
+    document.getElementById("stop").innerHTML = `<b>Stop:</b> ${end || "-"}`;
+    document.getElementById("duration").innerHTML = `<b>Duration:</b> ${duration || "-"}`;
+}
+
+// Analysis logic
 function analyzeCounter(c) {
 
     if (c.name.includes("Disk sec/Read") && c.avg > 0.02)
@@ -132,7 +156,7 @@ function analyzeCounter(c) {
     return "🟢 Healthy";
 }
 
-// ✅ Display result
+// Display table
 function displayResult(counters) {
 
     if (counters.length === 0) {
@@ -168,33 +192,4 @@ function displayResult(counters) {
     html += "</table>";
 
     document.getElementById("output").innerHTML = html;
-}
-function displayMeta(start, end, duration) {
-    document.querySelector("p:nth-of-type(1)").innerText = "Start: " + start;
-    document.querySelector("p:nth-of-type(2)").innerText = "Stop: " + end;
-
-    // Add duration dynamically
-    let durEl = document.getElementById("duration");
-
-    if (!durEl) {
-        durEl = document.createElement("p");
-        durEl.id = "duration";
-        document.body.insertBefore(durEl, document.getElementById("output"));
-    }
-
-    durEl.innerText = "Duration: " + duration;
-}
-
-function calculateDuration(start, end) {
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-
-    const diffMs = endDate - startDate;
-
-    const seconds = Math.floor(diffMs / 1000);
-    const mins = Math.floor(seconds / 60);
-    const hours = Math.floor(mins / 60);
-    const days = Math.floor(hours / 24);
-
-    return `${days}d ${hours % 24}h ${mins % 60}m ${seconds % 60}s`;
 }
