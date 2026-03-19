@@ -1,21 +1,18 @@
-// File upload handler
+// File upload
 document.getElementById('fileInput').addEventListener('change', function (e) {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-
     reader.onload = function (event) {
         parseCSV(event.target.result);
     };
-
     reader.readAsText(file);
 });
 
 function parseCSV(text) {
 
     const lines = text.split('\n').filter(l => l.trim() !== '');
-
     if (lines.length < 2) {
         alert("Invalid CSV file");
         return;
@@ -27,7 +24,6 @@ function parseCSV(text) {
     let timestamps = [];
     let serverName = "";
 
-    // Initialize counters + extract server name
     headers.forEach(h => {
         if (h.includes('\\')) {
             data[h] = [];
@@ -39,7 +35,6 @@ function parseCSV(text) {
         }
     });
 
-    // Read rows
     for (let i = 1; i < lines.length; i++) {
         const row = splitCSVLine(lines[i]);
 
@@ -48,9 +43,7 @@ function parseCSV(text) {
         headers.forEach((h, index) => {
             if (data[h] && row[index]) {
                 const val = parseFloat(row[index]);
-                if (!isNaN(val)) {
-                    data[h].push(val);
-                }
+                if (!isNaN(val)) data[h].push(val);
             }
         });
     }
@@ -60,14 +53,12 @@ function parseCSV(text) {
         return;
     }
 
-    // Time calculations
     const startTime = timestamps[0];
     const endTime = timestamps[timestamps.length - 1];
     const duration = calculateDuration(startTime, endTime);
 
     displayMeta(serverName, startTime, endTime, duration);
 
-    // Calculate counters
     let counters = [];
 
     for (let key in data) {
@@ -80,16 +71,16 @@ function parseCSV(text) {
 
         counters.push({
             name: cleanName(key),
-            avg: avg,
-            max: max,
-            min: min
+            avg,
+            max,
+            min
         });
     }
 
     displayResult(counters);
 }
 
-// Proper CSV split (handles quotes)
+// CSV parser
 function splitCSVLine(line) {
     const result = [];
     const regex = /(".*?"|[^",]+)(?=\s*,|\s*$)/g;
@@ -104,35 +95,30 @@ function splitCSVLine(line) {
 
 // Clean counter name
 function cleanName(name) {
-    return name
-        .replace(/^\\\\.*?\\/, '')
-        .replace(/"/g, '');
+    return name.replace(/^\\\\.*?\\/, '').replace(/"/g, '');
 }
 
-// Duration calculation
+// Duration
 function calculateDuration(start, end) {
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    const diff = new Date(end) - new Date(start);
 
-    const diffMs = endDate - startDate;
+    const s = Math.floor(diff / 1000);
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    const d = Math.floor(h / 24);
 
-    const seconds = Math.floor(diffMs / 1000);
-    const mins = Math.floor(seconds / 60);
-    const hours = Math.floor(mins / 60);
-    const days = Math.floor(hours / 24);
-
-    return `${days}d ${hours % 24}h ${mins % 60}m ${seconds % 60}s`;
+    return `${d}d ${h % 24}h ${m % 60}m ${s % 60}s`;
 }
 
-// Display metadata
+// Metadata display
 function displayMeta(server, start, end, duration) {
     document.getElementById("server").innerHTML = `<b>Server:</b> ${server || "-"}`;
-    document.getElementById("start").innerHTML = `<b>Start:</b> ${start || "-"}`;
-    document.getElementById("stop").innerHTML = `<b>Stop:</b> ${end || "-"}`;
-    document.getElementById("duration").innerHTML = `<b>Duration:</b> ${duration || "-"}`;
+    document.getElementById("start").innerHTML = `<b>Start:</b> ${start}`;
+    document.getElementById("stop").innerHTML = `<b>Stop:</b> ${end}`;
+    document.getElementById("duration").innerHTML = `<b>Duration:</b> ${duration}`;
 }
 
-// Analysis logic
+// Analysis
 function analyzeCounter(c) {
 
     if (c.name.includes("Disk sec/Read") && c.avg > 0.02)
@@ -150,18 +136,14 @@ function analyzeCounter(c) {
     if (c.name.includes("Page life expectancy") && c.avg < 300)
         return "🔴 Memory Pressure";
 
-    if (c.name.includes("Buffer cache hit ratio") && c.avg < 95)
-        return "🟠 Cache Issue";
-
     return "🟢 Healthy";
 }
 
-// Severity scoring
+// Severity score
 function getSeverityScore(c) {
-    const status = analyzeCounter(c);
-
-    if (status.includes("🔴")) return 3;
-    if (status.includes("🟠")) return 2;
+    const s = analyzeCounter(c);
+    if (s.includes("🔴")) return 3;
+    if (s.includes("🟠")) return 2;
     return 1;
 }
 
@@ -172,62 +154,87 @@ function getRowColor(status) {
     return "#ccffcc";
 }
 
-// Display results with Top Issues
+// Display results
 function displayResult(counters) {
 
-    if (counters.length === 0) {
-        document.getElementById("output").innerHTML = "<p>No valid data found.</p>";
-        return;
-    }
-
-    // Sort worst first
     counters.sort((a, b) => getSeverityScore(b) - getSeverityScore(a));
 
-    // Top 5 issues
-    const topIssues = counters
-        .filter(c => analyzeCounter(c) !== "🟢 Healthy")
-        .slice(0, 5);
+    const topIssues = counters.filter(c => analyzeCounter(c) !== "🟢 Healthy").slice(0, 5);
 
-    let summaryHtml = "<h3>Top Issues</h3>";
+    let html = "<h3>Top Issues</h3>";
 
     if (topIssues.length === 0) {
-        summaryHtml += "<p>✅ No major issues detected</p>";
+        html += "<p>✅ No major issues</p>";
     } else {
-        summaryHtml += "<ul>";
+        html += "<ul>";
         topIssues.forEach(c => {
-            summaryHtml += `<li><b>${c.name}</b> → ${analyzeCounter(c)}</li>`;
+            html += `<li>${c.name} → ${analyzeCounter(c)}</li>`;
         });
-        summaryHtml += "</ul>";
+        html += "</ul>";
     }
 
-    // Table
-    let tableHtml = `
-        <table>
-        <tr>
-            <th>Counter</th>
-            <th>Avg</th>
-            <th>Max</th>
-            <th>Min</th>
-            <th>Status</th>
-        </tr>
-    `;
+    html += `
+    <table>
+    <tr>
+        <th>Counter</th>
+        <th>Avg</th>
+        <th>Max</th>
+        <th>Min</th>
+        <th>Status</th>
+    </tr>`;
 
     counters.forEach(c => {
         const status = analyzeCounter(c);
         const color = getRowColor(status);
 
-        tableHtml += `
-            <tr style="background-color:${color}">
-                <td>${c.name}</td>
-                <td>${c.avg.toFixed(3)}</td>
-                <td>${c.max.toFixed(3)}</td>
-                <td>${c.min.toFixed(3)}</td>
-                <td>${status}</td>
-            </tr>
-        `;
+        html += `
+        <tr style="background:${color}">
+            <td>${c.name}</td>
+            <td>${c.avg.toFixed(3)}</td>
+            <td>${c.max.toFixed(3)}</td>
+            <td>${c.min.toFixed(3)}</td>
+            <td>${status}</td>
+        </tr>`;
     });
 
-    tableHtml += "</table>";
+    html += "</table>";
 
-    document.getElementById("output").innerHTML = summaryHtml + tableHtml;
+    document.getElementById("output").innerHTML = html;
+
+    renderCharts(counters);
+}
+
+// Charts for 🔴 only
+function renderCharts(counters) {
+
+    const container = document.getElementById("charts");
+    container.innerHTML = "<h3>Problematic Counters</h3>";
+
+    const red = counters.filter(c => analyzeCounter(c).includes("🔴"));
+
+    if (red.length === 0) {
+        container.innerHTML += "<p>No critical issues</p>";
+        return;
+    }
+
+    red.forEach((c, i) => {
+        const canvas = document.createElement("canvas");
+        container.appendChild(canvas);
+
+        new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: ["Avg", "Max", "Min"],
+                datasets: [{
+                    label: c.name,
+                    data: [c.avg, c.max, c.min]
+                }]
+            }
+        });
+    });
+}
+
+// PDF export
+function exportPDF() {
+    html2pdf().from(document.body).save('PerfMon_Report.pdf');
 }
