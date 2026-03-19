@@ -66,7 +66,7 @@ function parseCSV(text) {
             avg,
             max,
             min,
-            series: values   // 🔥 needed for graph
+            series: values
         });
     }
 
@@ -86,9 +86,22 @@ function splitCSVLine(line) {
     return result;
 }
 
-// Clean name
+// Clean counter name
 function cleanName(name) {
     return name.replace(/^\\\\.*?\\/, '').replace(/"/g, '');
+}
+
+// 🔒 Mask server name (only last 4 visible)
+function maskServerName(name) {
+
+    if (!name) return "-";
+
+    if (name.length <= 4) return name;
+
+    const visible = name.slice(-4);
+    const masked = "X".repeat(name.length - 4);
+
+    return masked + visible;
 }
 
 // Duration
@@ -103,9 +116,9 @@ function calculateDuration(start, end) {
     return `${d}d ${h % 24}h ${m % 60}m ${s % 60}s`;
 }
 
-// Metadata
+// Metadata display (with masking)
 function displayMeta(server, start, end, duration) {
-    document.getElementById("server").innerHTML = `<b>Server:</b> ${server || "-"}`;
+    document.getElementById("server").innerHTML = `<b>Server:</b> ${maskServerName(server)}`;
     document.getElementById("start").innerHTML = `<b>Start:</b> ${start}`;
     document.getElementById("stop").innerHTML = `<b>Stop:</b> ${end}`;
     document.getElementById("duration").innerHTML = `<b>Duration:</b> ${duration}`;
@@ -132,7 +145,7 @@ function analyzeCounter(c) {
     return "🟢 Healthy";
 }
 
-// Severity
+// Severity scoring
 function getSeverityScore(c) {
     const s = analyzeCounter(c);
     if (s.includes("🔴")) return 3;
@@ -147,7 +160,7 @@ function getRowColor(status) {
     return "#ccffcc";
 }
 
-// Display result
+// Display results
 function displayResult(counters, timestamps) {
 
     counters.sort((a, b) => getSeverityScore(b) - getSeverityScore(a));
@@ -197,7 +210,7 @@ function displayResult(counters, timestamps) {
     renderCharts(counters, timestamps);
 }
 
-// 🔥 LINE GRAPH (time-series)
+// 📈 Line graphs for 🔴 counters
 function renderCharts(counters, timestamps) {
 
     const container = document.getElementById("charts");
