@@ -4,8 +4,6 @@
     <title>PerfMon Analyzer</title>
 
     <!-- Basic Styling -->
-    <link rel="stylesheet" href="style.css">
-
     <style>
         body {
             font-family: Arial;
@@ -49,13 +47,14 @@
     <h2>PerfMon Analyzer Tool</h2>
 
     <p>
-        Upload PerfMon CSV file (Convert using: <b>relog input.blg -f csv -o output.csv</b>)
+        Upload PerfMon CSV file (Convert using: 
+        <b>relog input.blg -f csv -o output.csv</b>)
     </p>
 
     <!-- File Upload -->
     <input type="file" id="fileInput" />
 
-    <br>
+    <br><br>
 
     <!-- PDF Button -->
     <button onclick="exportPDF()">Download Report (PDF)</button>
@@ -72,23 +71,23 @@
 
     <hr>
 
-    <!-- Output -->
+    <!-- Output Table -->
     <div id="output"></div>
 
     <hr>
 
-    <!-- Charts -->
+    <!-- Charts Section -->
     <div id="charts"></div>
 
-    <!-- ✅ REQUIRED SCRIPTS (order matters) -->
+    <!-- REQUIRED LIBRARIES -->
 
-    <!-- Chart.js -->
+    <!-- Chart.js (for graphs) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- html2pdf -->
+    <!-- html2pdf (for PDF export) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-    <!-- Your logic -->
+    <!-- Your main logic -->
     <script src="script.js"></script>
 
 </body>
