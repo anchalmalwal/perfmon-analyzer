@@ -15,6 +15,10 @@
 
     <input type="file" id="fileInput" />
 
+    <br><br>
+
+    <button onclick="exportPDF()">Download Report (PDF)</button>
+
     <hr>
 
     <h3>Capture Details</h3>
@@ -28,7 +32,17 @@
 
     <div id="output"></div>
 
-    <!-- IMPORTANT: Only reference JS file, do NOT paste JS here -->
+    <hr>
+
+    <div id="charts"></div>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <!-- Your Script -->
     <script src="script.js"></script>
 
 </body>
