@@ -1,265 +1,176 @@
-// File upload
-document.getElementById('fileInput').addEventListener('change', function (e) {
-    const file = e.target.files[0];
+// ================================
+// PerfMon Analyzer - Full Script
+// ================================
+
+// Attach file handler
+document.getElementById('fileInput').addEventListener('change', handleFile);
+
+// -------------------------------
+// Sanitize Data (MASK SERVER + PATH)
+// -------------------------------
+function sanitizePerfmonData(csvText) {
+    return csvText
+        .replace(/\\\\[^\\]+\\/g, "") // remove \\SERVERNAME\
+        .replace(/[A-Z]:\\[^,\n]*/g, "PATH_MASKED"); // mask file paths
+}
+
+// -------------------------------
+// File Upload Handler
+// -------------------------------
+function handleFile(event) {
+    const file = event.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function (event) {
-        parseCSV(event.target.result);
+
+    reader.onload = function (e) {
+        let rawData = e.target.result;
+
+        // ✅ Clean data
+        let cleanData = sanitizePerfmonData(rawData);
+
+        processCSV(cleanData);
     };
+
     reader.readAsText(file);
-});
-
-function parseCSV(text) {
-
-    const lines = text.split('\n').filter(l => l.trim() !== '');
-    if (lines.length < 2) return;
-
-    const headers = splitCSVLine(lines[0]);
-
-    let data = {};
-    let timestamps = [];
-    let serverName = "";
-
-    headers.forEach(h => {
-        if (h.includes('\\')) {
-            data[h] = [];
-
-            if (!serverName) {
-                const match = h.match(/^\\\\([^\\]+)/);
-                if (match) serverName = match[1];
-            }
-        }
-    });
-
-    for (let i = 1; i < lines.length; i++) {
-        const row = splitCSVLine(lines[i]);
-
-        if (row[0]) timestamps.push(row[0]);
-
-        headers.forEach((h, index) => {
-            if (data[h] && row[index]) {
-                const val = parseFloat(row[index]);
-                if (!isNaN(val)) data[h].push(val);
-            }
-        });
-    }
-
-    const startTime = timestamps[0];
-    const endTime = timestamps[timestamps.length - 1];
-    const duration = calculateDuration(startTime, endTime);
-
-    displayMeta(serverName, startTime, endTime, duration);
-
-    let counters = [];
-
-    for (let key in data) {
-        const values = data[key];
-        if (values.length === 0) continue;
-
-        const avg = values.reduce((a, b) => a + b, 0) / values.length;
-        const max = Math.max(...values);
-        const min = Math.min(...values);
-
-        counters.push({
-            name: cleanName(key),
-            avg,
-            max,
-            min,
-            series: values
-        });
-    }
-
-    displayResult(counters, timestamps);
 }
 
-// CSV parser
-function splitCSVLine(line) {
-    const result = [];
-    const regex = /(".*?"|[^",]+)(?=\s*,|\s*$)/g;
-    let match;
+// -------------------------------
+// CSV Processing
+// -------------------------------
+function processCSV(data) {
+    const lines = data.split("\n").filter(l => l.trim() !== "");
 
-    while ((match = regex.exec(line)) !== null) {
-        result.push(match[0].replace(/"/g, '').trim());
-    }
-
-    return result;
-}
-
-// Clean counter name
-function cleanName(name) {
-    return name.replace(/^\\\\.*?\\/, '').replace(/"/g, '');
-}
-
-// 🔒 Mask server name (only last 4 visible)
-function maskServerName(name) {
-
-    if (!name) return "-";
-
-    if (name.length <= 4) return name;
-
-    const visible = name.slice(-4);
-    const masked = "X".repeat(name.length - 4);
-
-    return masked + visible;
-}
-
-// Duration
-function calculateDuration(start, end) {
-    const diff = new Date(end) - new Date(start);
-
-    const s = Math.floor(diff / 1000);
-    const m = Math.floor(s / 60);
-    const h = Math.floor(m / 60);
-    const d = Math.floor(h / 24);
-
-    return `${d}d ${h % 24}h ${m % 60}m ${s % 60}s`;
-}
-
-// Metadata display (with masking)
-function displayMeta(server, start, end, duration) {
-    document.getElementById("server").innerHTML = `<b>Server:</b> ${maskServerName(server)}`;
-    document.getElementById("start").innerHTML = `<b>Start:</b> ${start}`;
-    document.getElementById("stop").innerHTML = `<b>Stop:</b> ${end}`;
-    document.getElementById("duration").innerHTML = `<b>Duration:</b> ${duration}`;
-}
-
-// Analysis
-function analyzeCounter(c) {
-
-    if (c.name.includes("Disk sec/Read") && c.avg > 0.02)
-        return "🔴 High Disk Latency";
-
-    if (c.name.includes("Disk sec/Write") && c.avg > 0.02)
-        return "🔴 High Disk Write Latency";
-
-    if (c.name.includes("% Processor Time") && c.avg > 80)
-        return "🔴 CPU Bottleneck";
-
-    if (c.name.includes("Available MBytes") && c.avg < 2000)
-        return "🟠 Low Memory";
-
-    if (c.name.includes("Page life expectancy") && c.avg < 300)
-        return "🔴 Memory Pressure";
-
-    return "🟢 Healthy";
-}
-
-// Severity scoring
-function getSeverityScore(c) {
-    const s = analyzeCounter(c);
-    if (s.includes("🔴")) return 3;
-    if (s.includes("🟠")) return 2;
-    return 1;
-}
-
-// Row color
-function getRowColor(status) {
-    if (status.includes("🔴")) return "#ffcccc";
-    if (status.includes("🟠")) return "#ffe0b3";
-    return "#ccffcc";
-}
-
-// Display results
-function displayResult(counters, timestamps) {
-
-    counters.sort((a, b) => getSeverityScore(b) - getSeverityScore(a));
-
-    const topIssues = counters.filter(c => analyzeCounter(c) !== "🟢 Healthy").slice(0, 5);
-
-    let html = "<h3>Top Issues</h3>";
-
-    if (topIssues.length === 0) {
-        html += "<p>✅ No major issues</p>";
-    } else {
-        html += "<ul>";
-        topIssues.forEach(c => {
-            html += `<li>${c.name} → ${analyzeCounter(c)}</li>`;
-        });
-        html += "</ul>";
-    }
-
-    html += `
-    <table>
-    <tr>
-        <th>Counter</th>
-        <th>Avg</th>
-        <th>Max</th>
-        <th>Min</th>
-        <th>Status</th>
-    </tr>`;
-
-    counters.forEach(c => {
-        const status = analyzeCounter(c);
-        const color = getRowColor(status);
-
-        html += `
-        <tr style="background:${color}">
-            <td>${c.name}</td>
-            <td>${c.avg.toFixed(3)}</td>
-            <td>${c.max.toFixed(3)}</td>
-            <td>${c.min.toFixed(3)}</td>
-            <td>${status}</td>
-        </tr>`;
-    });
-
-    html += "</table>";
-
-    document.getElementById("output").innerHTML = html;
-
-    renderCharts(counters, timestamps);
-}
-
-// 📈 Line graphs for 🔴 counters
-function renderCharts(counters, timestamps) {
-
-    const container = document.getElementById("charts");
-    container.innerHTML = "<h3>Problematic Counters (Line Graph)</h3>";
-
-    const red = counters.filter(c => analyzeCounter(c).includes("🔴"));
-
-    if (red.length === 0) {
-        container.innerHTML += "<p>No critical issues</p>";
+    if (lines.length < 2) {
+        alert("Invalid CSV file");
         return;
     }
 
-    red.forEach((c, i) => {
+    const headers = lines[0].split(",");
 
-        const canvas = document.createElement("canvas");
-        canvas.style.maxWidth = "900px";
-        canvas.style.marginBottom = "40px";
+    let timeIndex = 0;
+    let cpuIndex = findColumn(headers, "% Processor Time");
+    let memIndex = findColumn(headers, "Available MBytes");
+    let diskReadIndex = findColumn(headers, "Avg. Disk sec/Read");
+    let diskWriteIndex = findColumn(headers, "Avg. Disk sec/Write");
+    let pleIndex = findColumn(headers, "Page life expectancy");
 
-        container.appendChild(canvas);
+    let tableHTML = "<table><tr>";
 
-        const ctx = canvas.getContext("2d");
+    headers.forEach(h => {
+        tableHTML += `<th>${cleanHeader(h)}</th>`;
+    });
 
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: timestamps,
-                datasets: [{
-                    label: c.name,
-                    data: c.series,
-                    borderWidth: 2,
-                    fill: false,
-                    tension: 0.2
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    x: {
-                        ticks: {
-                            maxTicksLimit: 10
-                        }
-                    }
+    tableHTML += "</tr>";
+
+    let times = [];
+    let cpuData = [];
+    let memData = [];
+    let diskData = [];
+    let pleData = [];
+
+    for (let i = 1; i < lines.length; i++) {
+        let cols = lines[i].split(",");
+
+        tableHTML += "<tr>";
+
+        cols.forEach(c => {
+            tableHTML += `<td>${c}</td>`;
+        });
+
+        tableHTML += "</tr>";
+
+        // Collect chart data
+        if (cols.length > cpuIndex) {
+            times.push(cols[timeIndex]);
+            cpuData.push(parseFloat(cols[cpuIndex]) || 0);
+            memData.push(parseFloat(cols[memIndex]) || 0);
+            diskData.push(parseFloat(cols[diskReadIndex]) || 0);
+            pleData.push(parseFloat(cols[pleIndex]) || 0);
+        }
+    }
+
+    tableHTML += "</table>";
+
+    document.getElementById("output").innerHTML = tableHTML;
+
+    // Capture details
+    document.getElementById("start").innerText = "Start: " + times[0];
+    document.getElementById("stop").innerText = "Stop: " + times[times.length - 1];
+    document.getElementById("duration").innerText = "Duration: " + times.length + " samples";
+    document.getElementById("server").innerText = "Server: MASKED";
+
+    // Draw charts
+    drawCharts(times, cpuData, memData, diskData, pleData);
+}
+
+// -------------------------------
+// Find Column Index
+// -------------------------------
+function findColumn(headers, keyword) {
+    return headers.findIndex(h => h.toLowerCase().includes(keyword.toLowerCase()));
+}
+
+// -------------------------------
+// Clean Header Names
+// -------------------------------
+function cleanHeader(header) {
+    return header
+        .replace(/\\\\[^\\]+\\/g, "")
+        .replace(/"/g, "");
+}
+
+// -------------------------------
+// Draw Charts
+// -------------------------------
+function drawCharts(times, cpu, mem, disk, ple) {
+
+    const chartDiv = document.getElementById("charts");
+    chartDiv.innerHTML = `
+        <canvas id="cpuChart"></canvas>
+        <canvas id="memChart"></canvas>
+        <canvas id="diskChart"></canvas>
+        <canvas id="pleChart"></canvas>
+    `;
+
+    createChart("cpuChart", "CPU %", times, cpu);
+    createChart("memChart", "Memory Available MB", times, mem);
+    createChart("diskChart", "Disk Read Latency", times, disk);
+    createChart("pleChart", "Page Life Expectancy", times, ple);
+}
+
+// -------------------------------
+// Create Chart
+// -------------------------------
+function createChart(canvasId, label, labels, data) {
+    new Chart(document.getElementById(canvasId), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: label,
+                data: data,
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    display: false
                 }
             }
-        });
+        }
     });
 }
 
-// PDF export
+// -------------------------------
+// Export PDF
+// -------------------------------
 function exportPDF() {
-    html2pdf().from(document.body).save('PerfMon_Report.pdf');
+    const element = document.body;
+
+    html2pdf()
+        .from(element)
+        .save("PerfMon_Report.pdf");
 }
