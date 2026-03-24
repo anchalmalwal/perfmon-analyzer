@@ -1,163 +1,103 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-PERZ4S7R6V"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-PERZ4S7R6V');
+</script>
     <title>PerfMon Analyzer</title>
 
-    <!-- Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXX"></script>
-    <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-XXXXXXX');
-    </script>
-
+    <!-- Basic Styling -->
     <style>
-        body { font-family: Arial; margin: 20px; }
-        table { border-collapse: collapse; width: 100%; font-size: 12px; }
-        th, td { padding: 6px; border: 1px solid #ccc; }
-        th { background-color: #f4f4f4; }
-        canvas { margin-top: 20px; }
+        body {
+            font-family: Arial;
+            margin: 20px;
+        }
+
+        h2 {
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 8px 12px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 8px;
+            border: 1px solid #ccc;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f4f4f4;
+        }
+
+        #charts canvas {
+            margin-top: 20px;
+        }
     </style>
 </head>
 
 <body>
 
-<h2>PerfMon Analyzer</h2>
+    <h2>PerfMon Analyzer Tool</h2>
 
-<p><b>Total Visits:</b> <span id="visitCount">Loading...</span></p>
+    <p>
+        Upload PerfMon CSV file (Convert using: 
+        <b>relog input.blg -f csv -o output.csv</b>)
+    </p>
 
-<input type="file" id="fileInput" />
-<br><br>
+    <!-- File Upload -->
+    <input type="file" id="fileInput" />
 
-<button onclick="exportPDF()">Download Report</button>
+    <br><br>
 
-<hr>
+    <!-- PDF Button -->
+    <button onclick="exportPDF()">Download Report (PDF)</button>
 
-<p id="start"></p>
-<p id="stop"></p>
+    <hr>
 
-<div id="output"></div>
-<div id="charts"></div>
+    <!-- Capture Details -->
+    <h3>Capture Details</h3>
 
-<!-- Libraries -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <p id="server"><b>Server:</b> -</p>
+    <p id="start"><b>Start:</b> -</p>
+    <p id="stop"><b>Stop:</b> -</p>
+    <p id="duration"><b>Duration:</b> -</p>
 
-<script>
+    <hr>
 
-// --------------------
-// INIT
-// --------------------
-document.getElementById('fileInput').addEventListener('change', handleFile);
-updateVisitCount();
+    <!-- Output Table -->
+    <div id="output"></div>
 
-// --------------------
-// SANITIZE
-// --------------------
-function sanitizePerfmonData(text) {
-    return text
-        .replace(/\\\\[^\\]+\\/g, "")
-        .replace(/[A-Z]:\\[^,\n]*/g, "PATH_MASKED");
-}
+    <hr>
 
-// --------------------
-// HANDLE FILE
-// --------------------
-function handleFile(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+    <!-- Charts Section -->
+    <div id="charts"></div>
 
-    trackFileUpload(); // ✅ Track upload
+    <!-- REQUIRED LIBRARIES -->
 
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        let clean = sanitizePerfmonData(e.target.result);
-        processCSV(clean);
-    };
-    reader.readAsText(file);
-}
+    <!-- Chart.js (for graphs) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-// --------------------
-// PROCESS CSV
-// --------------------
-function processCSV(data) {
-    const lines = data.split("\n");
-    const headers = lines[0].split(",");
+    <!-- html2pdf (for PDF export) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-    let cpuIndex = headers.findIndex(h => h.includes("% Processor Time"));
-    let memIndex = headers.findIndex(h => h.includes("Available MBytes"));
-
-    let times = [];
-    let cpu = [];
-    let mem = [];
-
-    for (let i = 1; i < lines.length; i++) {
-        let cols = lines[i].split(",");
-        times.push(cols[0]);
-        cpu.push(parseFloat(cols[cpuIndex]) || 0);
-        mem.push(parseFloat(cols[memIndex]) || 0);
-    }
-
-    document.getElementById("start").innerText = "Start: " + times[0];
-    document.getElementById("stop").innerText = "Stop: " + times[times.length - 1];
-
-    drawChart("CPU %", times, cpu, "cpuChart");
-    drawChart("Memory MB", times, mem, "memChart");
-}
-
-// --------------------
-// DRAW CHART
-// --------------------
-function drawChart(label, labels, data, id) {
-    let canvas = document.createElement("canvas");
-    canvas.id = id;
-    document.getElementById("charts").appendChild(canvas);
-
-    new Chart(canvas, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{ label: label, data: data }]
-        }
-    });
-}
-
-// --------------------
-// PDF
-// --------------------
-function exportPDF() {
-    trackPDFDownload(); // ✅ Track download
-    html2pdf().from(document.body).save("Report.pdf");
-}
-
-// --------------------
-// ANALYTICS EVENTS
-// --------------------
-function trackFileUpload() {
-    if (typeof gtag === "function") {
-        gtag('event', 'file_upload');
-    }
-}
-
-function trackPDFDownload() {
-    if (typeof gtag === "function") {
-        gtag('event', 'pdf_download');
-    }
-}
-
-// --------------------
-// VISIT COUNTER
-// --------------------
-function updateVisitCount() {
-    fetch('https://api.countapi.xyz/hit/perfmon-analyzer/visits')
-        .then(res => res.json())
-        .then(data => {
-            document.getElementById('visitCount').innerText = data.value;
-        });
-}
-
-</script>
+    <!-- Your main logic -->
+    <script src="script.js"></script>
 
 </body>
 </html>
