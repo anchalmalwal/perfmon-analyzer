@@ -14,10 +14,6 @@
             margin-bottom: 10px;
         }
 
-        h3 {
-            margin-top: 20px;
-        }
-
         button {
             padding: 8px 12px;
             margin-top: 10px;
@@ -28,11 +24,10 @@
             border-collapse: collapse;
             width: 100%;
             margin-top: 10px;
-            font-size: 12px;
         }
 
         th, td {
-            padding: 6px;
+            padding: 8px;
             border: 1px solid #ccc;
             text-align: left;
         }
@@ -42,11 +37,6 @@
         }
 
         #charts canvas {
-            margin-top: 25px;
-            max-height: 300px;
-        }
-
-        .section {
             margin-top: 20px;
         }
     </style>
@@ -62,7 +52,7 @@
     </p>
 
     <!-- File Upload -->
-    <input type="file" id="fileInput" accept=".csv" />
+    <input type="file" id="fileInput" />
 
     <br><br>
 
@@ -72,181 +62,33 @@
     <hr>
 
     <!-- Capture Details -->
-    <div class="section">
-        <h3>Capture Details</h3>
+    <h3>Capture Details</h3>
 
-        <p id="server"><b>Server:</b> MASKED</p>
-        <p id="start"><b>Start:</b> -</p>
-        <p id="stop"><b>Stop:</b> -</p>
-        <p id="duration"><b>Duration:</b> -</p>
-    </div>
+    <p id="server"><b>Server:</b> -</p>
+    <p id="start"><b>Start:</b> -</p>
+    <p id="stop"><b>Stop:</b> -</p>
+    <p id="duration"><b>Duration:</b> -</p>
 
     <hr>
 
     <!-- Output Table -->
-    <div class="section">
-        <h3>Raw Data</h3>
-        <div id="output"></div>
-    </div>
+    <div id="output"></div>
 
     <hr>
 
     <!-- Charts Section -->
-    <div class="section">
-        <h3>Performance Charts</h3>
-        <div id="charts"></div>
-    </div>
+    <div id="charts"></div>
 
     <!-- REQUIRED LIBRARIES -->
 
-    <!-- Chart.js -->
+    <!-- Chart.js (for graphs) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- html2pdf -->
+    <!-- html2pdf (for PDF export) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-    <!-- ================================
-         MAIN SCRIPT (INLINE)
-    ================================= -->
-    <script>
-
-    // File handler
-    document.getElementById('fileInput').addEventListener('change', handleFile);
-
-    // -------------------------------
-    // Sanitize Data
-    // -------------------------------
-    function sanitizePerfmonData(csvText) {
-        return csvText
-            .replace(/\\\\[^\\]+\\/g, "")
-            .replace(/[A-Z]:\\[^,\n]*/g, "PATH_MASKED");
-    }
-
-    // -------------------------------
-    // File Upload
-    // -------------------------------
-    function handleFile(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-
-        reader.onload = function (e) {
-            let rawData = e.target.result;
-            let cleanData = sanitizePerfmonData(rawData);
-            processCSV(cleanData);
-        };
-
-        reader.readAsText(file);
-    }
-
-    // -------------------------------
-    // Process CSV
-    // -------------------------------
-    function processCSV(data) {
-        const lines = data.split("\n").filter(l => l.trim() !== "");
-        const headers = lines[0].split(",");
-
-        let timeIndex = 0;
-        let cpuIndex = findColumn(headers, "% Processor Time");
-        let memIndex = findColumn(headers, "Available MBytes");
-        let diskIndex = findColumn(headers, "Avg. Disk sec/Read");
-        let pleIndex = findColumn(headers, "Page life expectancy");
-
-        let tableHTML = "<table><tr>";
-
-        headers.forEach(h => {
-            tableHTML += `<th>${cleanHeader(h)}</th>`;
-        });
-
-        tableHTML += "</tr>";
-
-        let times = [];
-        let cpuData = [];
-        let memData = [];
-        let diskData = [];
-        let pleData = [];
-
-        for (let i = 1; i < lines.length; i++) {
-            let cols = lines[i].split(",");
-
-            tableHTML += "<tr>";
-            cols.forEach(c => tableHTML += `<td>${c}</td>`);
-            tableHTML += "</tr>";
-
-            times.push(cols[timeIndex]);
-            cpuData.push(parseFloat(cols[cpuIndex]) || 0);
-            memData.push(parseFloat(cols[memIndex]) || 0);
-            diskData.push(parseFloat(cols[diskIndex]) || 0);
-            pleData.push(parseFloat(cols[pleIndex]) || 0);
-        }
-
-        tableHTML += "</table>";
-        document.getElementById("output").innerHTML = tableHTML;
-
-        // Capture details
-        document.getElementById("start").innerText = "Start: " + times[0];
-        document.getElementById("stop").innerText = "Stop: " + times[times.length - 1];
-        document.getElementById("duration").innerText = "Duration: " + times.length + " samples";
-
-        drawCharts(times, cpuData, memData, diskData, pleData);
-    }
-
-    // -------------------------------
-    function findColumn(headers, keyword) {
-        return headers.findIndex(h => h.toLowerCase().includes(keyword.toLowerCase()));
-    }
-
-    function cleanHeader(header) {
-        return header.replace(/\\\\[^\\]+\\/g, "").replace(/"/g, "");
-    }
-
-    // -------------------------------
-    // Charts
-    // -------------------------------
-    function drawCharts(times, cpu, mem, disk, ple) {
-        const chartDiv = document.getElementById("charts");
-        chartDiv.innerHTML = `
-            <canvas id="cpuChart"></canvas>
-            <canvas id="memChart"></canvas>
-            <canvas id="diskChart"></canvas>
-            <canvas id="pleChart"></canvas>
-        `;
-
-        createChart("cpuChart", "CPU %", times, cpu);
-        createChart("memChart", "Memory MB", times, mem);
-        createChart("diskChart", "Disk Latency", times, disk);
-        createChart("pleChart", "PLE", times, ple);
-    }
-
-    function createChart(id, label, labels, data) {
-        new Chart(document.getElementById(id), {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: label,
-                    data: data,
-                    fill: false
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    x: { display: false }
-                }
-            }
-        });
-    }
-
-    // -------------------------------
-    // PDF Export
-    // -------------------------------
-    function exportPDF() {
-        html2pdf().from(document.body).save("PerfMon_Report.pdf");
-    }
-
-    </script>
+    <!-- Your main logic -->
+    <script src="script.js"></script>
 
 </body>
 </html>
