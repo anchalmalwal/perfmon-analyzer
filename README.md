@@ -1,6 +1,6 @@
-# perfmon-analyzer
-Free PerfMon Analyzer Tool
+PerfMon Analyzer Tool
 
+Author: Anchal Malwal
 
 Overview
 
